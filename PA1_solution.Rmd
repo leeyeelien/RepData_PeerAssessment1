@@ -1,0 +1,126 @@
+---
+title: 'Reproducible Research: Project 1'
+author: "YLL"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+```
+
+## Dataset: Daily Steps
+The dataset for this project is downloaded from [here](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip), 
+and unzips to a CSV file.<br>
+
+The file is read into R using read.csv and the NAs are removed for the initial
+analyses.<br>
+
+```{r read_data}
+data_raw <- read.csv("activity.csv")
+data <- data_raw[!is.na(data_raw$steps),]
+```
+
+## Average Daily Steps
+Using the data with NAs removed, the daily total steps are calculated and 
+displayed in a histogram.<br>
+The mean and median of the daily steps are computed using R functions mean and
+median.<br>
+
+```{r steps_histogram}
+daily_steps <- tapply (data$steps, as.factor(data$date), sum)
+daily_steps <- daily_steps[!is.na(daily_steps)]
+hist(daily_steps)
+print(paste("Mean daily steps: ", mean(daily_steps)))
+print(paste("Median of daily steps: ", median(daily_steps)))
+```
+
+## Average Daily Activity Pattern
+To look at the mean of the number of steps every day for each time interval, the
+data with NAs removed is used to create a plot.<br>
+The interval with the highest number of steps is calculated by identifying the
+largest average number of steps across all intervals.<br>
+
+```{r steps_interval_plot}
+intervals <- unique(data$interval)
+interval_steps <- tapply (data$steps, as.factor(data$interval), mean)
+interval_steps <- bind_cols(interval_steps,intervals)
+names(interval_steps) <- c("Steps", "Interval")
+plot(interval_steps$Interval,interval_steps$Steps,type="l")
+max_point <- interval_steps[interval_steps$Steps==max(interval_steps$Steps),]
+print (paste("Interval with maximum steps: ", max_point[2]))
+```
+
+## Imputing Missing Values
+All the NAs from the original data is replaced with the average value of the
+time interval to which the missing value belongs.<br>
+
+```{r missing_values}
+data_complete <- data_raw
+nas <- is.na(data_complete$steps)
+num_nas <- sum(nas)
+for (i in 1:length(data_complete$steps)) {
+  if (is.na(data_complete[i,1])) {
+    data_complete[i,1] <- interval_steps[interval_steps$Interval==data_complete[i,3],1]
+  }
+}
+```
+
+## Recalculate Average Daily Steps 
+Using the new completed data, the average daily steps is shown in a histogram
+and the mean and median are re-calculated.
+
+```{r steps_histogram_complete}
+daily_steps_complete <- tapply (data_complete$steps, as.factor(data_complete$date), sum)
+daily_steps_complete <- daily_steps_complete[!is.na(daily_steps_complete)]
+hist(daily_steps_complete)
+print(paste("Mean daily steps: ", mean(daily_steps_complete)))
+print(paste("Median of daily steps: ", median(daily_steps_complete)))
+```
+
+## Activity Pattern Difference
+To explore the difference in activity patterns between weekdays and weekends, 
+the completed data is analyzed to produce a plot with separate points for
+weekdays and weekends.<br>
+
+First, the "date" column is converted to class Date so that each date can be
+classified as either weekday or weekend. A new column indicating whether an
+observation is a weekday or not is added to the data.<br>
+
+```{r weekdays1}
+data_complete$date <- as.Date(data_complete$date, format="%Y-%m-%d")
+weekdays <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+data_complete <- mutate (data_complete, 
+                         isWeekday=(weekdays(data_complete$date) %in% weekdays))
+```
+
+Next, two subsets of the data are created - one for the weekdays and another
+for the weekends. The average steps per each time interval is calculated for 
+each data subset independently. Lastly, both data subset are shown in the same
+plot.<br>
+
+```{r weekdays2}
+weekday_steps <- filter(data_complete, data_complete$isWeekday==TRUE)
+weekend_steps <- filter(data_complete, data_complete$isWeekday==FALSE)
+
+weekday_ave <- tapply (weekday_steps$steps, as.factor(weekday_steps$interval), mean)
+weekday_ave <- bind_cols(weekday_ave,intervals)
+names(weekday_ave) <- c("Steps", "Interval")
+
+weekend_ave <- tapply (weekend_steps$steps, as.factor(weekend_steps$interval), mean)
+weekend_ave <- bind_cols(weekend_ave,intervals)
+names(weekend_ave) <- c("Steps", "Interval")
+
+plot(weekday_ave$Interval, weekday_ave$Steps,
+     type="l",
+     col="blue",
+     xlab="Interval", ylab="Steps")
+points(weekend_ave$Interval, weekend_ave$Steps, 
+       type="l",
+       col="red")
+legend ("topright", 
+        lty=1, 
+        col=c("blue","red"),
+        legend=c("weekday","weekend"))
+```
+
+End of report.
